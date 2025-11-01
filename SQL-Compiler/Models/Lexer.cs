@@ -13,22 +13,16 @@ namespace SQL_Compiler.Models
 
     public class Lexer
     {
-        // ======================  SPECIFICATIONS  ======================
-
-        // Case-sensitive
-        // Keywords (كل واحدة بتطلع باسمها هي نفسها)
         private readonly HashSet<string> _keywords = new()
         {
             "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES",
-            "UPDATE", "SET", "DELETE", "CREATE", "TABLE",
-            "AND", "OR", "NOT"
+            "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "DROP",
+            "ALTER", "ADD", "PRIMARY", "KEY", "FOREIGN", "REFERENCES",
+            "AND", "OR", "NOT", "NULL", "ORDER", "BY", "GROUP", "HAVING"
         };
 
-        // Data types (تفضل TYPE)
-        private readonly HashSet<string> _types = new() { "INT", "FLOAT", "TEXT" };
-
-        // Delimiters
-        private readonly HashSet<char> _delimiters = new() { '(', ')', ',', ';' };
+        private readonly HashSet<string> _types = new() { "INT", "FLOAT", "TEXT", "VARCHAR", "CHAR", "DATE", "DATETIME" };
+        private readonly HashSet<char> _delimiters = new() { '(', ')', ',', ';', '.' };
 
         public List<SqlToken> Analyze(string code)
         {
@@ -41,7 +35,6 @@ namespace SQL_Compiler.Models
             {
                 char c = code[i];
 
-                // ---------- Skip Whitespace ----------
                 if (char.IsWhiteSpace(c))
                 {
                     if (c == '\n') { line++; col = 1; }
@@ -50,7 +43,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Comments ----------
                 if (c == '-' && i + 1 < code.Length && code[i + 1] == '-')
                 {
                     while (i < code.Length && code[i] != '\n') { i++; }
@@ -81,7 +73,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Identifiers / Keywords / Types ----------
                 if (char.IsLetter(c))
                 {
                     int start = i, startCol = col;
@@ -102,7 +93,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Numbers ----------
                 if (char.IsDigit(c))
                 {
                     int start = i, startCol = col;
@@ -114,7 +104,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Strings ----------
                 if (c == '\'')
                 {
                     int startCol = col;
@@ -145,7 +134,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Operators ----------
                 string opType = "";
                 string opLexeme = c.ToString();
 
@@ -225,7 +213,6 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                // ---------- Delimiters ----------
                 if (_delimiters.Contains(c))
                 {
                     string type = c switch

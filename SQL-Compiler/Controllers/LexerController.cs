@@ -10,7 +10,6 @@ namespace SQL_Compiler.Controllers
         [HttpGet]
         public IActionResult Index() => View();
 
-        // Accept JSON body (AJAX) and return tokens with readable Type as string
         [HttpPost]
         public IActionResult Analyze([FromBody] string inputCode)
         {
@@ -20,10 +19,9 @@ namespace SQL_Compiler.Controllers
             var lexer = new Lexer();
             var tokens = lexer.Analyze(inputCode);
 
-            // Project to anonymous objects with Type as string
             var result = tokens.Select(t => new
             {
-                type = t.Type.ToString(),   // string value of enum
+                type = t.Type.ToString(),   
                 lexeme = t.Lexeme,
                 line = t.Line,
                 column = t.Column
