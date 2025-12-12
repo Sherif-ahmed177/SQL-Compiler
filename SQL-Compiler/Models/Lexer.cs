@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace SQL_Compiler.Models
 {
     public class SqlToken
@@ -18,7 +15,8 @@ namespace SQL_Compiler.Models
             "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES",
             "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "DROP",
             "ALTER", "ADD", "PRIMARY", "KEY", "FOREIGN", "REFERENCES",
-            "AND", "OR", "NOT", "NULL", "ORDER", "BY", "GROUP", "HAVING"
+            "AND", "OR", "NOT", "NULL", "ORDER", "BY", "GROUP", "HAVING",
+            "ASC", "DESC", "TRUE", "FALSE"
         };
 
         private readonly HashSet<string> _types = new() { "INT", "FLOAT", "TEXT", "VARCHAR", "CHAR", "DATE", "DATETIME" };
@@ -49,14 +47,21 @@ namespace SQL_Compiler.Models
                     continue;
                 }
 
-                if (c == '#')
+                // Multi-line comment: ##...##
+                if (c == '#' && i + 1 < code.Length && code[i + 1] == '#')
                 {
                     int startLine = line, startCol = col;
-                    i++; col++;
+                    i += 2; col += 2; // Skip both ##
                     bool closed = false;
                     while (i < code.Length)
                     {
-                        if (code[i] == '#') { closed = true; i++; col++; break; }
+                        // Check for closing ##
+                        if (code[i] == '#' && i + 1 < code.Length && code[i + 1] == '#')
+                        {
+                            closed = true;
+                            i += 2; col += 2; // Skip both ##
+                            break;
+                        }
                         if (code[i] == '\n') { line++; col = 1; i++; continue; }
                         i++; col++;
                     }

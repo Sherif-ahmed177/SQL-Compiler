@@ -16,16 +16,26 @@ namespace SQL_Compiler.Controllers
             if (string.IsNullOrWhiteSpace(inputCode))
                 return BadRequest("Please enter SQL-like code.");
 
+            // 1. Lexical Analysis
             var lexer = new Lexer();
             var tokens = lexer.Analyze(inputCode);
 
-            var result = tokens.Select(t => new
+            // 2. Syntax Analysis
+            var parser = new Parser(tokens);
+            var root = parser.Parse();
+
+            var result = new
             {
-                type = t.Type.ToString(),   
-                lexeme = t.Lexeme,
-                line = t.Line,
-                column = t.Column
-            }).ToList();
+                tokens = tokens.Select(t => new
+                {
+                    type = t.Type.ToString(),   
+                    lexeme = t.Lexeme,
+                    line = t.Line,
+                    column = t.Column
+                }).ToList(),
+                tree = root, // ParseTreeNode is serializable
+                errors = parser.Errors
+            };
 
             return Json(result);
         }
