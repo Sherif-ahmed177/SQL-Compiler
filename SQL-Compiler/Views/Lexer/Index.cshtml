@@ -1,249 +1,395 @@
 @{
-    ViewData["Title"] = "SQL Compiler - Lexical Analyzer";
+    ViewData["Title"] = "Syntax Analyzer";
 }
 
-<div class="page-content">
-    <div class="card">
-        <div class="card-header d-flex align-items-center">
-            <h1 class="h4 mb-0">SQL Lexical Analyzer</h1>
-        </div>
-        
-        <div class="card-body">
-            <div class="row g-4">
-                <div class="col-lg-6">
-                    <div class="mb-4">
-                        <label for="inputCode" class="form-label">SQL Input</label>
-                        <textarea id="inputCode" class="form-control code-box" rows="10" placeholder="Enter your SQL code here..."></textarea>
-                        <div class="form-text">Type or paste SQL code to analyze its tokens</div>
-                    </div>
-
-                    <div class="d-flex gap-2 flex-wrap">
-                        <button id="analyzeBtn" class="btn btn-primary">
-                            <i class="bi bi-lightning-fill me-2"></i>Analyze
-                        </button>
-                        <button id="uploadBtn" class="btn btn-outline-primary" title="Upload .txt file">
-                            <i class="bi bi-upload me-2"></i>Upload File
-                        </button>
-                        <input type="file" id="fileInput" accept=".txt,text/plain" class="d-none" />
-                        <button id="exampleBtn" class="btn btn-outline-primary">
-                            <i class="bi bi-lightbulb me-2"></i>Load Example
-                        </button>
-                        <button id="clearBtn" class="btn btn-outline-secondary">
-                            <i class="bi bi-trash me-2"></i>Clear
-                        </button>
-                        <div id="analyzeSpinner" class="spinner-border text-primary ms-2 align-self-center d-none">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-
-                    <div id="errorBox" class="alert alert-danger mt-4 d-none"></div>
+<div class="row g-4 page-content">
+    <!-- LEFT PANEL: Editor -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">SQL Input</h5>
+                <div>
+                    <button id="uploadBtn" class="btn btn-sm btn-outline-primary" title="Upload File"><i class="bi bi-upload"></i> Upload</button>
+                    <input type="file" id="fileInput" accept=".txt,.sql" class="d-none" />
+                    <button id="exampleBtn" class="btn btn-sm btn-outline-secondary" title="Load Example">Example</button>
+                    <button id="clearBtn" class="btn btn-sm btn-outline-danger" title="Clear">Clear</button>
+                </div>
+            </div>
+            
+            <div class="card-body d-flex flex-column">
+                <textarea id="inputCode" class="form-control code-editor flex-grow-1 mb-3" 
+                          rows="15"
+                          spellcheck="false" 
+                          placeholder="SELECT * FROM students WHERE id = 1;"></textarea>
+                
+                <div id="errorBox" class="alert alert-danger d-none mb-3 py-2 px-3 small">
+                    <strong>Error:</strong> <span id="errorMsg"></span>
                 </div>
 
-                <div class="col-lg-6">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h2 class="h5 mb-0">Token Analysis</h2>
-                        <button id="downloadBtn" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-download me-2"></i>Download CSV
-                        </button>
-                    </div>
+                <div class="d-grid">
+                    <button id="analyzeBtn" class="btn btn-primary">
+                        <span id="btnText">Analyze Code</span>
+                        <div id="analyzeSpinner" class="spinner-border spinner-border-sm d-none"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    <div class="mb-3">
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="bi bi-search"></i>
-                            </span>
-                            <input id="filterInput" class="form-control" placeholder="Filter tokens..." />
+    <!-- RIGHT PANEL: Results -->
+    <div class="col-lg-8">
+        <!-- Status Bar -->
+        <div id="statusBar" class="status-bar pending">
+            <i class="bi bi-hourglass-split"></i>
+            <span id="statusText">Ready to analyze</span>
+        </div>
+        
+        <div class="card h-100" style="border-top-left-radius: 0; border-top-right-radius: 0;">
+            <div class="card-header bg-light p-0">
+                <ul class="nav nav-tabs card-header-tabs m-0" id="resultTabs" role="tablist">
+                    <li class="nav-item ms-3">
+                        <button class="nav-link active border-0 py-3" id="tree-tab" data-bs-toggle="tab" data-bs-target="#tree-pane" type="button">Parse Tree</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link border-0 py-3" id="tokens-tab" data-bs-toggle="tab" data-bs-target="#tokens-pane" type="button">Tokens</button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card-body p-0 overflow-hidden" style="min-height: 500px;">
+                <div class="tab-content h-100">
+                    
+                    <!-- TAB 1: PARSE TREE -->
+                    <div class="tab-pane fade show active h-100" id="tree-pane" role="tabpanel">
+                        <div class="h-100 position-relative border bg-light overflow-hidden d-flex flex-column">
+                            <!-- Zoom Controls -->
+                            <div class="position-absolute top-0 end-0 m-3 btn-group z-3" role="group">
+                                <button type="button" class="btn btn-sm btn-light border shadow-sm" id="zoomIn" title="Zoom In"><i class="bi bi-plus-lg"></i></button>
+                                <button type="button" class="btn btn-sm btn-light border shadow-sm" id="zoomOut" title="Zoom Out"><i class="bi bi-dash-lg"></i></button>
+                                <button type="button" class="btn btn-sm btn-light border shadow-sm" id="zoomReset" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            </div>
+
+                            <!-- Syntax Errors Display -->
+                            <div id="syntaxErrorBox" class="d-none border-bottom border-danger bg-danger bg-opacity-10 p-3">
+                                <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Syntax Errors</h6>
+                                <div id="syntaxErrorList" class="small font-monospace text-danger"></div>
+                            </div>
+
+                            <div class="flex-grow-1 tree-container" id="treeContainer">
+                                <div id="treeEmptyState" class="text-center text-muted py-5 mt-5">
+                                    <p class="lead">Run analysis to generate the syntax tree.</p>
+                                </div>
+                                <!-- Tree Root -->
+                                <div id="treeView" class="tree d-none"></div>
+                            </div>
                         </div>
                     </div>
 
-                    <div id="resultSection" class="d-none">
-                        <div class="table-responsive mb-4">
-                            <table class="table">
-                                <thead>
+                    <!-- TAB 2: TOKENS -->
+                    <div class="tab-pane fade h-100" id="tokens-pane" role="tabpanel">
+                        <div class="h-100 overflow-auto p-3">
+                            <table class="table table-hover table-bordered table-sm">
+                                <thead class="table-light sticky-top">
                                     <tr>
-                                        <th>Token Type</th>
+                                        <th>Type</th>
                                         <th>Lexeme</th>
+                                        <th>Line</th>
+                                        <th>Column</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tokenTableBody"></tbody>
                             </table>
                         </div>
-
-                        <div class="token-summary">
-                            <h3 class="h6 mb-3">Token Overview</h3>
-                            <div id="tokenBadgeContainer" class="token-badges"></div>
-                        </div>
                     </div>
 
-                    <div id="emptyState" class="text-center py-5">
-                        <div class="empty-state-icon mb-3">
-                            <i class="bi bi-code-square text-muted" style="font-size: 2rem;"></i>
-                        </div>
-                        <h3 class="h6 mb-2">No Tokens Found</h3>
-                        <p class="text-muted mb-0">Enter SQL code and click Analyze to see tokens</p>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+@section Scripts {
     <script>
         const el = id => document.getElementById(id);
-    const analyzeBtn = el('analyzeBtn');
-    const clearBtn = el('clearBtn');
-    const exampleBtn = el('exampleBtn');
-        const spinner = el('analyzeSpinner');
+        
+        // Define Controls
+        const analyzeBtn = el('analyzeBtn');
+        const inputCode = el('inputCode');
         const errorBox = el('errorBox');
-        const resultSection = el('resultSection');
-        const emptyState = el('emptyState');
-        const tableBody = el('tokenTableBody');
-        const badgeContainer = el('tokenBadgeContainer');
-        const filterInput = el('filterInput');
+        const errorMsg = el('errorMsg');
+        const spinner = el('analyzeSpinner');
+        const btnText = el('btnText');
+        
+        const treeView = el('treeView');
+        const treeEmpty = el('treeEmptyState');
+        const tokenTable = el('tokenTableBody');
+        const treeContainer = el('treeContainer');
+        const statusBar = el('statusBar');
+        const statusText = el('statusText');
 
-        function setLoading(isLoading) {
-            if (isLoading) {
-                analyzeBtn.disabled = true;
-                spinner.classList.remove('d-none');
-            } else {
-                analyzeBtn.disabled = false;
-                spinner.classList.add('d-none');
-            }
+        // Zoom Logic
+        let scale = 1;
+        const ZOOM_STEP = 0.1;
+        
+        el('zoomIn').addEventListener('click', () => {
+            scale += ZOOM_STEP;
+            applyZoom();
+        });
+        el('zoomOut').addEventListener('click', () => {
+             if(scale > 0.2) { 
+                scale -= ZOOM_STEP;
+                applyZoom();
+             }
+        });
+        el('zoomReset').addEventListener('click', () => {
+            scale = 1;
+            applyZoom();
+        });
+
+        function applyZoom() {
+            treeView.style.transform = `scale(${scale})`;
+            // Adjust width to compensate for scaling if needed, 
+            // but transform-origin: top center handles most.
         }
 
-        function clearResults() {
-            tableBody.innerHTML = '';
-            badgeContainer.innerHTML = '';
-            resultSection.classList.add('d-none');
-            emptyState.classList.remove('d-none');
-        }
+        // Mouse Drag to Scroll (Pan)
+        let isDown = false;
+        let startX, startY, scrollLeft, scrollTop;
 
-        function mapBadgeClass(type) {
-            const t = (type || '').toLowerCase();
-            if (t.includes('keyword')) return 'badge bg-primary';
-            if (t.includes('identifier')) return 'badge bg-info text-dark';
-            if (t.includes('number') || t.includes('int') || t.includes('float')) return 'badge bg-warning text-dark';
-            if (t.includes('string')) return 'badge bg-success';
-            if (t.includes('operator') || t.includes('symbol')) return 'badge bg-secondary';
-            if (t.includes('punctuation')) return 'badge bg-dark';
-            return 'badge bg-light text-dark border';
-        }
+        treeContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            treeContainer.classList.add('active-drag'); // Optional css
+            startX = e.pageX - treeContainer.offsetLeft;
+            startY = e.pageY - treeContainer.offsetTop;
+            scrollLeft = treeContainer.scrollLeft;
+            scrollTop = treeContainer.scrollTop;
+            treeContainer.style.cursor = 'grabbing';
+        });
 
+        treeContainer.addEventListener('mouseleave', () => {
+            isDown = false;
+            treeContainer.style.cursor = 'grab';
+        });
+
+        treeContainer.addEventListener('mouseup', () => {
+            isDown = false;
+            treeContainer.style.cursor = 'grab';
+        });
+
+        treeContainer.addEventListener('mousemove', (e) => {
+            if(!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - treeContainer.offsetLeft;
+            const y = e.pageY - treeContainer.offsetTop;
+            const walkX = (x - startX) * 1.5; // Scroll-fast
+            const walkY = (y - startY) * 1.5;
+            treeContainer.scrollLeft = scrollLeft - walkX;
+            treeContainer.scrollTop = scrollTop - walkY;
+        });
+
+        // ACTIONS
         analyzeBtn.addEventListener('click', async () => {
-            const input = el('inputCode').value.trim();
-            errorBox.classList.add('d-none');
-            clearResults();
-
-            if (!input) {
-                errorBox.textContent = 'Please enter SQL-like code.';
-                errorBox.classList.remove('d-none');
-                return;
-            }
-
+            const code = inputCode.value.trim();
+            if(!code) return showError("Please enter some SQL code to analyze.");
+            
+            resetUI();
             setLoading(true);
 
             try {
-                const response = await fetch('/Lexer/Analyze', {
+                const res = await fetch('/Lexer/Analyze', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(input)
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(code)
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    errorBox.textContent = errorText || 'Server error';
-                    errorBox.classList.remove('d-none');
-                    setLoading(false);
-                    return;
+                if(!res.ok) throw new Error(await res.text());
+                
+                const data = await res.json();
+                
+                // Handle Syntax Errors FIRST
+                const syntaxErrorBox = el('syntaxErrorBox');
+                const syntaxErrorList = el('syntaxErrorList');
+                
+                if(data.errors && data.errors.length > 0) {
+                    // ERRORS EXIST - Show errors prominently, DON'T show tree
+                    syntaxErrorList.innerHTML = data.errors.map(err => 
+                        `<div class="mb-1 p-2 bg-white border border-danger rounded">• ${escapeHtml(err)}</div>`
+                    ).join('');
+                    syntaxErrorBox.classList.remove('d-none');
+                    
+                    // Hide tree and show error message instead
+                    treeView.classList.add('d-none');
+                    treeEmpty.innerHTML = `
+                        <div class="text-center text-danger py-5 mt-5">
+                            <i class="bi bi-x-circle display-1"></i>
+                            <h5 class="mt-3">Syntax Error(s) Found</h5>
+                            <p class="text-muted">Fix the errors above to see the parse tree.</p>
+                        </div>
+                    `;
+                    treeEmpty.classList.remove('d-none');
+                    
+                    // Update Status Bar - ERROR
+                    statusBar.className = 'status-bar error';
+                    statusText.innerHTML = `<i class="bi bi-x-circle me-2"></i>Syntax Error Detected (${data.errors.length} error${data.errors.length > 1 ? 's' : ''})`;
+                    
+                    // Highlight code editor with error
+                    inputCode.classList.add('has-error');
+                    
+                    // Show in left panel
+                    showError(`${data.errors.length} syntax error(s) found. See Parse Tree tab for details.`);
+                } else {
+                    // NO ERRORS - Show tree normally
+                    syntaxErrorBox.classList.add('d-none');
+                    hideError();
+                    
+                    // Update Status Bar - VALID
+                    statusBar.className = 'status-bar valid';
+                    statusText.innerHTML = '<i class="bi bi-check-circle me-2"></i>Valid Syntax';
+                    
+                    // Remove error highlight from code editor
+                    inputCode.classList.remove('has-error');
+                    
+                    // Render Tree
+                    if(data.tree) {
+                        renderTree(data.tree);
+                    }
                 }
+                
+                // Always render tokens
+                renderTokens(data.tokens);
 
-                const tokens = await response.json();
-                if (!tokens || tokens.length === 0) {
-                    errorBox.textContent = 'No tokens returned.';
-                    errorBox.classList.remove('d-none');
-                    setLoading(false);
-                    return;
-                }
-
-                emptyState.classList.add('d-none');
-                resultSection.classList.remove('d-none');
-
-                tokens.forEach(token => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td><small class="text-muted">${token.type}</small></td><td>${escapeHtml(token.lexeme)}</td>`;
-                    tableBody.appendChild(tr);
-
-                    const span = document.createElement('span');
-                    span.className = mapBadgeClass(token.type) + ' py-1 px-2';
-                    span.textContent = `${token.type}: ${token.lexeme}`;
-                    badgeContainer.appendChild(span);
-                });
-
-                setLoading(false);
-                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             } catch (err) {
-                errorBox.textContent = 'An error occurred. Please try again.';
-                errorBox.classList.remove('d-none');
+                showError(err.message || "An unexpected error occurred.");
+            } finally {
                 setLoading(false);
             }
         });
 
-        clearBtn.addEventListener('click', () => {
-            el('inputCode').value = '';
-            clearResults();
-        });
+        // ----------------------------------------------------
+        // VISUALIZATION LOGIC (Updated for Pure CSS Tree)
+        // ----------------------------------------------------
 
-        exampleBtn.addEventListener('click', () => {
-            el('inputCode').value = "CREATE TABLE students (id INT, name TEXT);\nINSERT INTO students VALUES (1, 'Sherif');\nSELECT name FROM students WHERE id = 1;";
-            analyzeBtn.click();
-        });
+        function renderTokens(tokens) {
+            tokenTable.innerHTML = '';
+            tokens.forEach(t => {
+                const row = `<tr>
+                    <td><span class="badge bg-light text-dark border">${t.type}</span></td>
+                    <td><span class="font-monospace">${escapeHtml(t.lexeme)}</span></td>
+                    <td>${t.line}</td>
+                    <td>${t.column}</td>
+                </tr>`;
+                tokenTable.innerHTML += row;
+            });
+        }
 
-        const fileInputCtrl = el('fileInput');
-        const uploadBtn = el('uploadBtn');
-        uploadBtn.addEventListener('click', () => fileInputCtrl.click());
-        fileInputCtrl.addEventListener('change', async (ev) => {
-            const f = fileInputCtrl.files && fileInputCtrl.files[0];
-            if (!f) return;
-            const name = f.name || '';
-            if (!name.toLowerCase().endsWith('.txt') && f.type !== 'text/plain') {
-                errorBox.textContent = 'Please select a .txt file.';
-                errorBox.classList.remove('d-none');
-                return;
+        function renderTree(rootNode) {
+            treeEmpty.classList.add('d-none');
+            treeView.classList.remove('d-none');
+            
+            const ul = document.createElement('ul');
+            ul.appendChild(createTreeNode(rootNode));
+            treeView.innerHTML = '';
+            treeView.appendChild(ul);
+        }
+
+        function createTreeNode(node) {
+            const li = document.createElement('li');
+            
+            // Node visual
+            const div = document.createElement('div');
+            div.className = 'node-content';
+            
+            let html = '';
+            if(node.name === "KEYWORD") {
+                html = `<span class="node-grammar">${escapeHtml(node.name)}</span><br><span class="node-lexeme">${escapeHtml(node.lexeme)}</span>`;
+            } else if (node.name === "IDENTIFIER") {
+                html = `<span class="node-grammar">ID</span><br><span class="node-name">${escapeHtml(node.lexeme)}</span>`;
+            } else if (node.name === "DELIMITER" || node.name === "OPERATOR") {
+                html = `<span class="node-symbol">${escapeHtml(node.lexeme)}</span>`;
+            } else if (node.name === "STRING" || node.name === "NUMBER" || node.name == "TYPE") {
+                html = `<span class="node-grammar">${node.name}</span><br><span class="node-lexeme">${escapeHtml(node.lexeme)}</span>`;
+            } else {
+                // Non-terminal
+                html = `<span class="node-name">${escapeHtml(node.name)}</span>`;
+                if(node.lexeme) html += `<br><span class="text-muted small">${escapeHtml(node.lexeme)}</span>`;
             }
+            
+            div.innerHTML = html;
+            li.appendChild(div);
+
+            // Children recursion
+            if (node.children && node.children.length > 0) {
+                const ul = document.createElement('ul');
+                node.children.forEach(child => {
+                    ul.appendChild(createTreeNode(child));
+                });
+                li.appendChild(ul);
+            }
+
+            return li;
+        }
+
+        // ----------------------------------------------------
+        // UTILITIES
+        // ----------------------------------------------------
+
+        function setLoading(isLoading) {
+            analyzeBtn.disabled = isLoading;
+            if(isLoading) {
+                spinner.classList.remove('d-none');
+                btnText.textContent = " Processing...";
+            } else {
+                spinner.classList.add('d-none');
+                btnText.textContent = 'Analyze Code';
+            }
+        }
+
+        function resetUI() {
+            hideError();
+            treeView.innerHTML = '';
+            treeView.classList.add('d-none');
+            treeEmpty.classList.remove('d-none');
+            tokenTable.innerHTML = '';
+        }
+
+        function showError(msg) {
+            errorMsg.innerHTML = msg;
+            errorBox.classList.remove('d-none');
+        }
+
+        function hideError() {
+            errorBox.classList.add('d-none');
+        }
+
+        function escapeHtml(text) {
+             if(!text) return '';
+             return text.replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;");
+        }
+
+        el('exampleBtn').addEventListener('click', () => {
+inputCode.value = `SELECT * FROM students WHERE age >= 18;
+INSERT INTO users (id, name) VALUES (1, 'Alice');`;
+        });
+        
+        el('clearBtn').addEventListener('click', () => {
+            inputCode.value = '';
+            resetUI();
+        });
+
+        // File Upload
+        const fileInput = el('fileInput');
+        el('uploadBtn').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
             const reader = new FileReader();
-            reader.onload = () => {
-                const text = reader.result || '';
-                el('inputCode').value = text;
-                analyzeBtn.click();
+            reader.onload = (e) => {
+                inputCode.value = e.target.result;
             };
-            reader.onerror = () => {
-                errorBox.textContent = 'Failed to read the file.';
-                errorBox.classList.remove('d-none');
-            };
-            reader.readAsText(f, 'UTF-8');
-            fileInputCtrl.value = '';
+            reader.readAsText(file);
+            fileInput.value = ''; // Reset input
         });
-
-        filterInput.addEventListener('input', () => {
-            const q = filterInput.value.trim().toLowerCase();
-            Array.from(tableBody.children).forEach(row => {
-                const t = row.children[0].textContent.toLowerCase();
-                const l = row.children[1].textContent.toLowerCase();
-                row.style.display = (t.includes(q) || l.includes(q)) ? '' : 'none';
-            });
-        });
-
-        el('downloadBtn').addEventListener('click', () => {
-            const rows = Array.from(tableBody.children).map(r => {
-                return [r.children[0].textContent, r.children[1].textContent].map(s => '"' + s.replace(/"/g,'""') + '"').join(',');
-            });
-            if (rows.length === 0) return;
-            const csv = ['"Type","Lexeme"', ...rows].join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'tokens.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-        });
-
-        function escapeHtml(text) { return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
     </script>
+}
